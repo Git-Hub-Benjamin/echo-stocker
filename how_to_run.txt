@@ -1,0 +1,13 @@
+1. Get a terminal, cd into current path of folder
+
+1.a (Have python311 installed and added to system PATH)
+1.b (Run the following cmds one after another)
+2. py -3.11 -m venv venv
+3. ./venv/Scripts/Activate.ps1
+4. pip install -r requirements.txt
+5. python ./stock_correlation_analyzer.py
+
+OR (less reccomended but if having problems above)
+
+2. pip install -r requirements.txt
+3. python ./stock_correlation_analyzer.py

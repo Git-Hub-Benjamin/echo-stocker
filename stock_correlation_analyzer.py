@@ -1,12 +1,3 @@
-#!/usr/bin/env python3
-"""
-Stock Correlation Analyzer
-Author: Benjamin Funk
-Date: 2025-10-05
-Purpose: Read tickers from a text file, fetch their weekly data from Yahoo Finance,
-and calculate correlations, R², p-values, and time-lagged (straddled) relationships.
-"""
-
 import yfinance as yf
 import numpy as np
 from datetime import datetime, timedelta
@@ -14,6 +5,8 @@ import csv
 from scipy import stats
 import time
 import os
+import pandas as pd
+import xlsxwriter
 
 
 # =========================
@@ -196,6 +189,73 @@ def main():
     print(f"\nBeginning correlation analysis with {len(valid_tickers)} valid tickers...")
     process_pairs(valid_tickers, ticker_data, max_weeks, OUTPUT_CSV)
 
+def read_and_summarize_csv(csv_file: str):
+    """
+    After generating stock_correlations.csv, this function reads it,
+    finds the highest correlations, and prints summary tables.
+    It also exports a concise Excel summary file.
+    """
+
+    import pandas as pd
+
+    # Attempt to load the CSV with safe encoding fallbacks
+    try:
+        try:
+            df = pd.read_csv(csv_file, encoding="utf-8")
+        except UnicodeDecodeError:
+            print("⚠️ UTF-8 decode failed, retrying with cp1252 (Windows encoding)...")
+            df = pd.read_csv(csv_file, encoding="cp1252")
+
+    except FileNotFoundError:
+        print(f"❌ File not found: {csv_file}")
+        return
+    except Exception as e:
+        print(f"⚠️ Error reading CSV file: {e}")
+        return
+
+    # --- Data integrity checks ---
+    if "Correlation" not in df.columns:
+        print("⚠️ Required 'Correlation' column not found in CSV.")
+        return
+
+    df = df.dropna(subset=["Correlation"])
+    if df.empty:
+        print("⚠️ CSV file has no valid correlation data.")
+        return
+
+    # --- Summaries ---
+    top_positive = df.sort_values("Correlation", ascending=False).head(10)
+    top_negative = df.sort_values("Correlation", ascending=True).head(10)
+    top_significant = df.sort_values("P-Value", ascending=True).head(10)
+
+    print("\n🧩 ==== TOP 10 POSITIVE CORRELATIONS ====")
+    print(top_positive[["Ticker A", "Ticker B", "Weeks Lag", "Correlation", "R²", "P-Value"]]
+          .to_string(index=False))
+
+    print("\n📉 ==== TOP 10 NEGATIVE CORRELATIONS ====")
+    print(top_negative[["Ticker A", "Ticker B", "Weeks Lag", "Correlation", "R²", "P-Value"]]
+          .to_string(index=False))
+
+    print("\n🔬 ==== TOP 10 MOST SIGNIFICANT (LOW P-VALUE) ====")
+    print(top_significant[["Ticker A", "Ticker B", "Weeks Lag", "Correlation", "R²", "P-Value"]]
+          .to_string(index=False))
+
+    # --- Export summary to Excel ---
+    summary_excel = csv_file.replace(".csv", "_summary.xlsx")
+    try:
+        with pd.ExcelWriter(summary_excel, engine="xlsxwriter") as writer:
+            top_positive.to_excel(writer, sheet_name="Top Positive", index=False)
+            top_negative.to_excel(writer, sheet_name="Top Negative", index=False)
+            top_significant.to_excel(writer, sheet_name="Top Significant", index=False)
+        print(f"\n✅ Excel summary saved as: {summary_excel}")
+    except Exception as e:
+        print(f"⚠️ Error writing summary Excel file: {e}")
+
+    print("\n🎯 Summary analysis complete.")
 
 if __name__ == "__main__":
-    main()
+    choice = input("Run entire program? (Y) or Just correlation analyzer (N): ")
+    if choice != 'N' and choice != 'n':
+        main()
+    # Automatically read and summarize results
+    read_and_summarize_csv("stock_correlations.csv")
